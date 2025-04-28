@@ -4,12 +4,12 @@ const { Server } = require('socket.io');
 const { Pool } = require('pg');
 const { Client } = require('@stomp/stompjs');
 const SockJS = require('sockjs-client');
-
+require("dotenv").config();
 // Initialize Express
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
-const PORT = 4000;
+
 
 // Configure PostgreSQL connection
 const pool = new Pool({
@@ -204,8 +204,10 @@ io.on('connection', (socket) => {
 });
 
 // Start server after DB initialized
+const PORT = process.env.PORT ;
 initializeDatabase().then(() => {
-  server.listen(PORT, () => {
-    console.log(`🚀 Server running at http://localhost:${PORT}`);
-  });
+server.listen(PORT, () => {
+  console.log(`🚀 Server running at http://localhost:${PORT}`);
+});
+
 });
