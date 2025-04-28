@@ -1,0 +1,23 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon server.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@stomp/stompjs": "^7.1.1",
+    "backend": "file:",
+    "bluetooth-serial-port": "^3.0.2",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "nodemon": "^3.1.9",
+    "pg": "^8.15.0",
+    "socket.io": "^4.8.1",
+    "sockjs-client": "^1.6.1"
+  }
+}
