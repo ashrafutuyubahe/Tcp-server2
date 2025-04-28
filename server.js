@@ -2,20 +2,19 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const { Pool } = require('pg');
-const { Client } = require('@stomp/stompjs'); // Correct import
+const { Client } = require('@stomp/stompjs');
 const SockJS = require('sockjs-client');
 
+// Initialize Express
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 const PORT = 4000;
+
 // Configure PostgreSQL connection
 const pool = new Pool({
-  user: 'postgres',
-  host: 'localhost',
-  database: 'fitness',
-  password: 'aine',
-  port: 5432,
+  connectionString: 'postgresql://stoneproofdb_user:ijOfAUPNMogj7YCsFpmcnqUgkHgG7FXG@dpg-d009jevgi27c73b2a7vg-a.oregon-postgres.render.com/stoneproofdb',
+  ssl: { rejectUnauthorized: false }, // important for Render.com
 });
 
 // Sensor data object
@@ -44,36 +43,71 @@ app.get('/api/sensor', (req, res) => {
   res.json(sensorData);
 });
 
-// Connect to Java microservice WebSocket
-const socket = new SockJS('http://localhost:9000');
-const stompClient = new Client({
-  webSocketFactory: () => socket,
-  reconnectDelay: 5000, // Auto-reconnect every 5 seconds if disconnected
-  debug: (str) => {
-    console.log('STOMP Debug:', str); // Optional: for debugging
-  },
-});
+// Function to initialize DB and create table if not exists
+async function initializeDatabase() {
+  try {
+    const createTableQuery = `
+      CREATE TABLE IF NOT EXISTS sensor_data (
+        id SERIAL PRIMARY KEY,
+        device_id TEXT,
+        device_type TEXT,
+        heart_rate INTEGER,
+        boxing_hand TEXT,
+        boxing_punch_type TEXT,
+        boxing_power INTEGER,
+        boxing_speed INTEGER,
+        cadence_wheel INTEGER,
+        sos_alert BOOLEAN,
+        battery INTEGER,
+        steps INTEGER,
+        calories INTEGER,
+        temperature FLOAT,
+        oxygen FLOAT,
+        last_updated TIMESTAMP
+      )
+    `;
+    await pool.query(createTableQuery);
+    console.log("✅ sensor_data table is ready.");
+  } catch (err) {
+    console.error("❌ Error creating sensor_data table:", err);
+  }
+}
 
-stompClient.onConnect = () => {
-  console.log('Connected to Java microservice WebSocket');
-  stompClient.subscribe('/topic/hub900', async (message) => {
-    const { type, data } = JSON.parse(message.body);
-    updateSensorData(type, data);
-    await saveToDatabase();
-    io.emit('sensorData', sensorData);
-  });
-};
+// Function to save sensorData into database
+async function saveToDatabase() {
+  try {
+    const query = `
+      INSERT INTO sensor_data (
+        device_id, device_type, heart_rate, boxing_hand, boxing_punch_type,
+        boxing_power, boxing_speed, cadence_wheel, sos_alert, battery,
+        steps, calories, temperature, oxygen, last_updated
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+    `;
+    const values = [
+      sensorData.deviceId,
+      sensorData.deviceType,
+      sensorData.heartRate,
+      sensorData.boxingHand,
+      sensorData.boxingPunchType,
+      sensorData.boxingPower,
+      sensorData.boxingSpeed,
+      sensorData.cadenceWheel,
+      sensorData.sosAlert,
+      sensorData.battery,
+      sensorData.steps,
+      sensorData.calories,
+      sensorData.temperature,
+      sensorData.oxygen,
+      sensorData.lastUpdated,
+    ];
+    await pool.query(query, values);
+  } catch (err) {
+    console.error('❌ Error saving data to PostgreSQL:', err);
+  }
+}
 
-stompClient.onStompError = (frame) => {
-  console.error('STOMP Error:', frame);
-};
-
-stompClient.onWebSocketError = (error) => {
-  console.error('WebSocket Error:', error);
-};
-
-stompClient.activate(); // Start the STOMP client
-
+// Function to update sensorData based on type
 function updateSensorData(type, data) {
   sensorData.lastUpdated = new Date();
   sensorData.deviceType = type;
@@ -105,68 +139,73 @@ function updateSensorData(type, data) {
   }
 }
 
+// Function to decode punch type
 function getPunchType(hand) {
   const punchType = (hand >> 1) & 0x03;
   return punchType === 0 ? 'Straight' : punchType === 1 ? 'Swing' : punchType === 2 ? 'Upcut' : 'Unknown';
 }
 
-async function saveToDatabase() {
-  try {
-    const query = `
-      INSERT INTO sensor_data (device_id, device_type, heart_rate, boxing_hand, boxing_punch_type, boxing_power, boxing_speed, cadence_wheel, sos_alert, battery, steps, calories, temperature, oxygen, last_updated)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-    `;
-    const values = [
-      sensorData.deviceId,
-      sensorData.deviceType,
-      sensorData.heartRate,
-      sensorData.boxingHand,
-      sensorData.boxingPunchType,
-      sensorData.boxingPower,
-      sensorData.boxingSpeed,
-      sensorData.cadenceWheel,
-      sensorData.sosAlert,
-      sensorData.battery,
-      sensorData.steps,
-      sensorData.calories,
-      sensorData.temperature,
-      sensorData.oxygen,
-      sensorData.lastUpdated,
-    ];
-    await pool.query(query, values);
-  } catch (err) {
-    console.error('Error saving data to PostgreSQL:', err);
-  }
-}
-
-io.on('connection', (socket) => {
-  console.log('Client connected via Socket.IO');
-  socket.emit('sensorData', sensorData);
-  socket.on('disconnect', () => {
-    console.log('Client disconnected');
-  });
-});
-// server.js
+// REST API to accept BLE data manually
 app.post("/api/sensor/ble", async (req, res) => {
   try {
     const bleData = req.body;
-    // Update sensorData
     sensorData = {
       ...sensorData,
       ...bleData,
       lastUpdated: new Date().toISOString(),
     };
-    // Save to PostgreSQL
     await saveToDatabase();
-    // Broadcast to Socket.IO clients (ProfileScreen, UserDetailScreen)
     io.emit("sensorData", sensorData);
     res.status(200).send("Data received");
   } catch (err) {
-    console.error("Error processing BLE data:", err);
+    console.error("❌ Error processing BLE data:", err);
     res.status(500).send("Server error");
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`Node.js API server listening at http://localhost:${PORT}`);
+// Connect to Java microservice WebSocket
+const socket = new SockJS('http://localhost:9000');
+const stompClient = new Client({
+  webSocketFactory: () => socket,
+  reconnectDelay: 5000,
+  debug: (str) => {
+    console.log('STOMP Debug:', str);
+  },
+});
+
+stompClient.onConnect = () => {
+  console.log('✅ Connected to Java microservice WebSocket');
+  stompClient.subscribe('/topic/hub900', async (message) => {
+    const { type, data } = JSON.parse(message.body);
+    updateSensorData(type, data);
+    await saveToDatabase();
+    io.emit('sensorData', sensorData);
+  });
+};
+
+stompClient.onStompError = (frame) => {
+  console.error('❌ STOMP Error:', frame);
+};
+
+stompClient.onWebSocketError = (error) => {
+  console.error('❌ WebSocket Error:', error);
+};
+
+stompClient.activate();
+
+// Socket.IO for real-time client updates
+io.on('connection', (socket) => {
+  console.log('⚡ Client connected via Socket.IO');
+  socket.emit('sensorData', sensorData);
+
+  socket.on('disconnect', () => {
+    console.log('⚡ Client disconnected');
+  });
+});
+
+// Start server after DB initialized
+initializeDatabase().then(() => {
+  server.listen(PORT, () => {
+    console.log(`🚀 Server running at http://localhost:${PORT}`);
+  });
 });
