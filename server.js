@@ -4,7 +4,7 @@ const { Server } = require('socket.io');
 const { Pool } = require('pg');
 const { Client } = require('@stomp/stompjs');
 const SockJS = require('sockjs-client');
-require("dotenv").config();
+
 // Initialize Express
 const app = express();
 const server = http.createServer(app);

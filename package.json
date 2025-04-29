@@ -9,6 +9,10 @@
   "author": "",
   "license": "ISC",
   "description": "",
+  "engines": {
+    "node": "18.x",
+    "npm": "9.x"
+  },
   "dependencies": {
     "@stomp/stompjs": "^7.1.1",
     "backend": "file:",
