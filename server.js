@@ -204,7 +204,8 @@ io.on('connection', (socket) => {
 });
 
 // Start server after DB initialized
-const PORT = process.env.PORT ;
+const PORT = process.env.PORT||3000 ;
+console.log(PORT)
 initializeDatabase().then(() => {
 server.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
