@@ -164,7 +164,8 @@ app.post("/api/sensor/ble", async (req, res) => {
 });
 
 // Connect to Java microservice WebSocket
-const socket = new SockJS('http://localhost:9000');
+const socket = new SockJS('http://ec2-51-21-254-242.eu-north-1.compute.amazonaws.com/');
+
 const stompClient = new Client({
   webSocketFactory: () => socket,
   reconnectDelay: 5000,
