@@ -13,7 +13,7 @@ const io = new Server(server);
 
 // Configure PostgreSQL connection
 const pool = new Pool({
-  connectionString: 'postgresql://stoneproofdb_user:ijOfAUPNMogj7YCsFpmcnqUgkHgG7FXG@dpg-d009jevgi27c73b2a7vg-a.oregon-postgres.render.com/stoneproofdb',
+  connectionString: 'postgresql://stoneproofdb_user:ftkiiuUd8WiUaNl5bBULv83jnHRz5hRY@dpg-d0kbbmbe5dus73bl3q20-a.oregon-postgres.render.com/stoneproofdb_au4h',
   ssl: { rejectUnauthorized: false }, // important for Render.com
 });
 
